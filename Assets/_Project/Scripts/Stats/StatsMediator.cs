@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 
 public class StatsMediator {
+    // TODO: Implement as a List for efficiency
     readonly LinkedList<StatModifier> modifiers = new();
 
     public event EventHandler<Query> Queries;
