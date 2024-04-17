@@ -1,43 +1,28 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public class StatsMediator {
-    readonly LinkedList<StatModifier> modifiers = new();
+    readonly List<StatModifier> listModifiers = new();
 
-    public event EventHandler<Query> Queries;
-    // NOTE: Delegates are invoked in the order they are added to the event.
-    public void PerformQuery(object sender, Query query) => Queries?.Invoke(sender, query);
+    public void PerformQuery(object sender, Query query) {
+        foreach (var modifier in listModifiers) {
+            modifier.Handle(sender, query);
+        }
+    }
 
     public void AddModifier(StatModifier modifier) {
-        modifiers.AddLast(modifier);
+        listModifiers.Add(modifier);
         modifier.MarkedForRemoval = false;
-        Queries += modifier.Handle;
-        
-        modifier.OnDispose += _ => {
-            modifiers.Remove(modifier);
-            Queries -= modifier.Handle;
-        };
+        modifier.OnDispose += _ => listModifiers.Remove(modifier);
     }
 
     public void Update(float deltaTime) {
-        // Update all modifiers with deltaTime
-        var node = modifiers.First;
-        while (node != null) {
-            var modifier = node.Value;
+        foreach (var modifier in listModifiers) {
             modifier.Update(deltaTime);
-            node = node.Next;
         }
-
-        // Dispose any that are finished, a.k.a Mark and Sweep
-        node = modifiers.First;
-        while (node != null) {
-            var nextNode = node.Next;
-
-            if (node.Value.MarkedForRemoval) {
-                node.Value.Dispose();
-            }
-
-            node = nextNode;
+        
+        foreach (var modifier in listModifiers.Where(modifier => modifier.MarkedForRemoval).ToList()) {
+            modifier.Dispose();
         }
     }
 }
