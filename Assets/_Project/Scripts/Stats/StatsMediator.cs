@@ -3,16 +3,26 @@ using System.Linq;
 
 public class StatsMediator {
     readonly List<StatModifier> listModifiers = new();
+    readonly Dictionary<StatType, IEnumerable<StatModifier>> modifiersCache = new();
     readonly IStatModifierApplicationOrder order = new NormalStatModifierOrder(); // OR INJECT
 
     public void PerformQuery(object sender, Query query) {
-        var applicableModifiers = listModifiers.Where(modifier => modifier.Type == query.StatType).ToList();
-        query.Value = order.Apply(applicableModifiers, query.Value);
+        if (!modifiersCache.ContainsKey(query.StatType)) {
+            modifiersCache[query.StatType] = listModifiers.Where(modifier => modifier.Type == query.StatType).ToList();
+        }
+        query.Value = order.Apply(modifiersCache[query.StatType], query.Value);
+    }
+
+    void InvalidateCache(StatType statType) {
+        modifiersCache.Remove(statType);
     }
 
     public void AddModifier(StatModifier modifier) {
         listModifiers.Add(modifier);
+        InvalidateCache(modifier.Type);
         modifier.MarkedForRemoval = false;
+        
+        modifier.OnDispose += _ => InvalidateCache(modifier.Type);
         modifier.OnDispose += _ => listModifiers.Remove(modifier);
     }
 
