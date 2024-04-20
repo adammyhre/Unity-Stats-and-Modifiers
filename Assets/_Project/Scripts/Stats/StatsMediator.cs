@@ -3,11 +3,11 @@ using System.Linq;
 
 public class StatsMediator {
     readonly List<StatModifier> listModifiers = new();
+    readonly IStatModifierApplicationOrder order = new NormalStatModifierOrder(); // OR INJECT
 
     public void PerformQuery(object sender, Query query) {
-        foreach (var modifier in listModifiers) {
-            modifier.Handle(sender, query);
-        }
+        var applicableModifiers = listModifiers.Where(modifier => modifier.Type == query.StatType).ToList();
+        query.Value = order.Apply(applicableModifiers, query.Value);
     }
 
     public void AddModifier(StatModifier modifier) {
