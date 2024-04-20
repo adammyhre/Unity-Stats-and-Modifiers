@@ -1,9 +1,10 @@
-using System;
 using UnityEngine;
+using UnityServiceLocator;
+
+public enum OperatorType { Add, Multiply }
 
 [RequireComponent(typeof(AudioSource))]
 public class StatModifierPickup : Pickup {
-    public enum OperatorType { Add, Multiply }
     
     // TODO Move configuration to ScriptableObject
     [SerializeField] StatType type = StatType.Attack;
@@ -12,12 +13,7 @@ public class StatModifierPickup : Pickup {
     [SerializeField] float duration = 5f;
 
     protected override void ApplyPickupEffect(Entity entity) {
-        StatModifier modifier = operatorType switch {
-            OperatorType.Add => new BasicStatModifier(type, duration, v => v + value),
-            OperatorType.Multiply => new BasicStatModifier(type, duration, v => v * value),
-            _ => throw new ArgumentOutOfRangeException()
-        };
-        
+        StatModifier modifier = ServiceLocator.For(this).Get<IStatModifierFactory>().Create(operatorType, type, value, duration);
         entity.Stats.Mediator.AddModifier(modifier);
     }
 }
