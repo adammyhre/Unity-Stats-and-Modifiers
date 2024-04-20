@@ -1,31 +1,19 @@
 using System;
 using UnityEngine;
 
-public class BasicStatModifier : StatModifier {
+public class StatModifier : IDisposable {
     readonly StatType type;
-    readonly Func<int, int> operation;
-
-    public BasicStatModifier(StatType type, float duration, Func<int, int> operation) : base(duration) {
-        this.type = type;
-        this.operation = operation;
-    }
-
-    public override void Handle(object sender, Query query) {
-        if (query.StatType == type) {
-            query.Value = operation(query.Value);
-        }
-    }
-}
-
-public abstract class StatModifier : IDisposable {
     public readonly Sprite icon;
     public bool MarkedForRemoval { get; set; }
+    readonly IOperationStrategy strategy;
     
     public event Action<StatModifier> OnDispose = delegate { };
     
     readonly CountdownTimer timer;
 
-    protected StatModifier(float duration) {
+    public StatModifier(StatType type, IOperationStrategy strategy, float duration) {
+        this.type = type;
+        this.strategy = strategy;
         if (duration <= 0) return;
         
         timer = new CountdownTimer(duration);
@@ -35,7 +23,11 @@ public abstract class StatModifier : IDisposable {
     
     public void Update(float deltaTime) => timer?.Tick(deltaTime);
     
-    public abstract void Handle(object sender, Query query);
+    public void Handle(object sender, Query query) {
+        if (query.StatType == type) {
+            query.Value = strategy.Calculate(query.Value);
+        }
+    }
 
     public void Dispose() {
         OnDispose.Invoke(this);
