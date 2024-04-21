@@ -1,44 +1,38 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public class StatsMediator {
-    // TODO: Implement as a List for efficiency
-    readonly LinkedList<StatModifier> modifiers = new();
+    readonly List<StatModifier> listModifiers = new();
+    readonly Dictionary<StatType, IEnumerable<StatModifier>> modifiersCache = new();
+    readonly IStatModifierApplicationOrder order = new NormalStatModifierOrder(); // OR INJECT
 
-    public event EventHandler<Query> Queries;
-    // NOTE: Delegates are invoked in the order they are added to the event.
-    public void PerformQuery(object sender, Query query) => Queries?.Invoke(sender, query);
+    public void PerformQuery(object sender, Query query) {
+        if (!modifiersCache.ContainsKey(query.StatType)) {
+            modifiersCache[query.StatType] = listModifiers.Where(modifier => modifier.Type == query.StatType).ToList();
+        }
+        query.Value = order.Apply(modifiersCache[query.StatType], query.Value);
+    }
+
+    void InvalidateCache(StatType statType) {
+        modifiersCache.Remove(statType);
+    }
 
     public void AddModifier(StatModifier modifier) {
-        modifiers.AddLast(modifier);
+        listModifiers.Add(modifier);
+        InvalidateCache(modifier.Type);
         modifier.MarkedForRemoval = false;
-        Queries += modifier.Handle;
         
-        modifier.OnDispose += _ => {
-            modifiers.Remove(modifier);
-            Queries -= modifier.Handle;
-        };
+        modifier.OnDispose += _ => InvalidateCache(modifier.Type);
+        modifier.OnDispose += _ => listModifiers.Remove(modifier);
     }
 
     public void Update(float deltaTime) {
-        // Update all modifiers with deltaTime
-        var node = modifiers.First;
-        while (node != null) {
-            var modifier = node.Value;
+        foreach (var modifier in listModifiers) {
             modifier.Update(deltaTime);
-            node = node.Next;
         }
-
-        // Dispose any that are finished, a.k.a Mark and Sweep
-        node = modifiers.First;
-        while (node != null) {
-            var nextNode = node.Next;
-
-            if (node.Value.MarkedForRemoval) {
-                node.Value.Dispose();
-            }
-
-            node = nextNode;
+        
+        foreach (var modifier in listModifiers.Where(modifier => modifier.MarkedForRemoval).ToList()) {
+            modifier.Dispose();
         }
     }
 }
